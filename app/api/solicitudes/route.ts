@@ -1,5 +1,7 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
-import { solicitudes } from "@/lib/solicitudesStore";
+import { getSolicitudesCollection } from "@/lib/database";
 import { Solicitud } from "@/models/Solicitud";
 
 export async function POST(req: Request) {
@@ -14,7 +16,6 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-
     const { titulo, descripcion, tipo, userId, userEmail } = body;
 
     if (!titulo || !descripcion || !tipo || !userId || !userEmail) {
@@ -36,7 +37,9 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    solicitudes.push(nuevaSolicitud);
+    const solicitudesDB = await getSolicitudesCollection();
+
+    solicitudesDB.insert(nuevaSolicitud);
 
     return NextResponse.json(
       {
@@ -46,6 +49,8 @@ export async function POST(req: Request) {
       { status: 201 }
     );
   } catch (error) {
+    console.error("POST /api/solicitudes error:", error);
+
     return NextResponse.json(
       { message: "Error al crear solicitud" },
       { status: 500 }
@@ -73,24 +78,30 @@ export async function GET(req: Request) {
       );
     }
 
-    // Admin puede ver todo
+    const solicitudesDB = await getSolicitudesCollection();
+
+    // Admin puede ver todas las solicitudes
     if (role === "admin") {
+      const todasLasSolicitudes = solicitudesDB.find();
+
       return NextResponse.json(
-        { solicitudes },
+        { solicitudes: todasLasSolicitudes },
         { status: 200 }
       );
     }
 
-    // Usuario solo ve sus solicitudes
-    const misSolicitudes = solicitudes.filter(
-      (s) => s.userId === userId
-    );
+    // Usuario solo ve sus propias solicitudes
+    const misSolicitudes = solicitudesDB.find({
+      userId,
+    });
 
     return NextResponse.json(
       { solicitudes: misSolicitudes },
       { status: 200 }
     );
   } catch (error) {
+    console.error("GET /api/solicitudes error:", error);
+
     return NextResponse.json(
       { message: "Error al obtener solicitudes" },
       { status: 500 }

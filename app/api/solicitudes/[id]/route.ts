@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { solicitudes } from "@/lib/solicitudesStore";
+import { getSolicitudesCollection } from "@/lib/database";
 
 export async function GET(
   req: Request,
@@ -21,9 +21,9 @@ export async function GET(
       );
     }
 
-    const solicitud = solicitudes.find(
-      (s) => s.id === id
-    );
+    const solicitudesDB = await getSolicitudesCollection();
+
+    const solicitud = solicitudesDB.findOne({ id });
 
     if (!solicitud) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function GET(
       );
     }
 
-    // Admin puede ver cualquiera
+    // El administrador puede ver cualquier solicitud
     if (role === "admin") {
       return NextResponse.json(
         { solicitud },
@@ -40,7 +40,7 @@ export async function GET(
       );
     }
 
-    // Usuario solo puede ver la suya
+    // El usuario solo puede ver su propia solicitud
     if (solicitud.userId !== userId) {
       return NextResponse.json(
         { message: "Acceso prohibido" },
@@ -53,6 +53,8 @@ export async function GET(
       { status: 200 }
     );
   } catch (error) {
+    console.error("GET /api/solicitudes/[id] error:", error);
+
     return NextResponse.json(
       { message: "Error al obtener solicitud" },
       { status: 500 }
@@ -78,9 +80,9 @@ export async function PUT(
       );
     }
 
-    const solicitud = solicitudes.find(
-      (s) => s.id === id
-    );
+    const solicitudesDB = await getSolicitudesCollection();
+
+    const solicitud = solicitudesDB.findOne({ id });
 
     if (!solicitud) {
       return NextResponse.json(
@@ -89,7 +91,7 @@ export async function PUT(
       );
     }
 
-    // Usuario solo puede editar la suya
+    // El usuario solo puede editar su propia solicitud
     if (role !== "admin" && solicitud.userId !== userId) {
       return NextResponse.json(
         { message: "Acceso prohibido" },
@@ -114,6 +116,8 @@ export async function PUT(
     solicitud.estado = estado || solicitud.estado;
     solicitud.updatedAt = new Date().toISOString();
 
+    solicitudesDB.update(solicitud);
+
     return NextResponse.json(
       {
         message: "Solicitud actualizada correctamente",
@@ -122,6 +126,8 @@ export async function PUT(
       { status: 200 }
     );
   } catch (error) {
+    console.error("PUT /api/solicitudes/[id] error:", error);
+
     return NextResponse.json(
       { message: "Error al actualizar solicitud" },
       { status: 500 }
@@ -147,20 +153,18 @@ export async function DELETE(
       );
     }
 
-    const index = solicitudes.findIndex(
-      (s) => s.id === id
-    );
+    const solicitudesDB = await getSolicitudesCollection();
 
-    if (index === -1) {
+    const solicitud = solicitudesDB.findOne({ id });
+
+    if (!solicitud) {
       return NextResponse.json(
         { message: "Solicitud no encontrada" },
         { status: 404 }
       );
     }
 
-    const solicitud = solicitudes[index];
-
-    // Usuario solo puede eliminar la suya
+    // El usuario solo puede eliminar su propia solicitud
     if (role !== "admin" && solicitud.userId !== userId) {
       return NextResponse.json(
         { message: "Acceso prohibido" },
@@ -168,13 +172,15 @@ export async function DELETE(
       );
     }
 
-    solicitudes.splice(index, 1);
+    solicitudesDB.remove(solicitud);
 
     return NextResponse.json(
       { message: "Solicitud eliminada correctamente" },
       { status: 200 }
     );
   } catch (error) {
+    console.error("DELETE /api/solicitudes/[id] error:", error);
+
     return NextResponse.json(
       { message: "Error al eliminar solicitud" },
       { status: 500 }
